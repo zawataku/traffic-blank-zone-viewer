@@ -1,103 +1,155 @@
-import Image from "next/image";
+"use client";
+import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
+import Papa from "papaparse";
+import { Stop } from "@/components/Map";
+import { FeatureCollection } from "geojson";
+
+interface Prefecture {
+  code: string;
+  name: string;
+}
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [stops, setStops] = useState<Stop[]>([]);
+  const [meshData, setMeshData] = useState<FeatureCollection | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isMeshLoading, setIsMeshLoading] = useState(false);
+  const [prefectures, setPrefectures] = useState<Prefecture[]>([]);
+  const [selectedPref, setSelectedPref] = useState('');
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+  const Map = dynamic(() => import("@/components/Map"), {
+    ssr: false,
+    loading: () => <p className="text-center mt-10">地図を読み込んでいます...</p>,
+  });
+
+  useEffect(() => {
+    const loadGovData = async () => {
+      const prefRes = await fetch('/data/prefectures.json');
+      const prefData = await prefRes.json();
+      setPrefectures(prefData);
+    };
+    loadGovData();
+  }, []);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsLoading(true);
+
+    const parsePromises = Array.from(files).map(file => {
+      return new Promise<Stop[]>((resolve, reject) => {
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            const validStops = results.data
+              .map((row: any) => ({
+                stop_name: row.stop_name,
+                stop_lat: parseFloat(row.stop_lat),
+                stop_lon: parseFloat(row.stop_lon),
+              }))
+              .filter(stop => !isNaN(stop.stop_lat) && !isNaN(stop.stop_lon));
+            resolve(validStops as Stop[]);
+          },
+          error: (error) => {
+            console.error(`Error parsing ${file.name}:`, error);
+            reject(error);
+          }
+        });
+      });
+    });
+
+    Promise.all(parsePromises)
+      .then(allStopsArrays => {
+        const newStops = allStopsArrays.flat();
+        setStops(prevStops => [...prevStops, ...newStops]);
+      })
+      .catch(error => {
+        alert("ファイルの解析中にエラーが発生しました。");
+        console.error("File parsing failed:", error);
+      })
+      .finally(() => {
+        setIsLoading(false);
+        event.target.value = '';
+      });
+  };
+
+  const handleClearStops = () => {
+    setStops([]);
+  };
+
+  const handleFetchMesh = async () => {
+    if (!selectedPref) {
+      alert("都道府県を選択してください。");
+      return;
+    }
+    setIsMeshLoading(true);
+    setMeshData(null);
+
+    try {
+      const filePath = `/mesh_data/${selectedPref}.json`;
+      const res = await fetch(filePath);
+      if (!res.ok) throw new Error("Local file not found");
+      const data = await res.json();
+      setMeshData(data);
+    } catch (error) {
+      console.error("Failed to fetch local mesh data:", error);
+      alert("選択された都道府県の人口メッシュデータは利用できません。");
+    } finally {
+      setIsMeshLoading(false);
+    }
+  };
+
+  return (
+    <main className="flex h-screen w-screen">
+      <div className="w-2/5 max-w-xl bg-gray-50 border-r border-gray-200 h-screen p-6 overflow-y-auto">
+        <div className="space-y-8">
+          <h1 className="text-2xl font-bold text-gray-800">交通空白地帯 可視化まっぷ</h1>
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold border-b pb-2">Step 1: バス停データを表示</h2>
+            <p className="text-sm text-gray-600">
+              GTFSの`stops.txt`ファイルを1つまたは複数選択してください。データは地図に追加されます。
+            </p>
+            <label htmlFor="gtfs-upload" className={`w-full text-center inline-block font-bold py-2 px-4 rounded cursor-pointer text-white ${isLoading ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-700'}`}>
+              {isLoading ? '処理中...' : 'stops.txt を選択 (複数可)'}
+            </label>
+            <input
+              id="gtfs-upload"
+              type="file"
+              accept=".txt,text/csv"
+              onChange={handleFileUpload}
+              className="hidden"
+              disabled={isLoading}
+              multiple
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            {stops.length > 0 && (
+              <p className="text-sm text-center text-gray-600">
+                現在 {stops.length} 件のバス停が表示されています。
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold border-b pb-2">Step 2: 人口メッシュを重ねる</h2>
+            <p className="text-sm text-gray-600">都道府県を選択して人口データを表示します。</p>
+            <div>
+              <label htmlFor="pref-select" className="block text-sm font-medium text-gray-700 mb-1">都道府県</label>
+              <select id="pref-select" value={selectedPref} onChange={(e) => setSelectedPref(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md">
+                <option value="">選択してください</option>
+                {prefectures.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
+              </select>
+            </div>
+            <button onClick={handleFetchMesh} disabled={isMeshLoading || !selectedPref} className={`w-full font-bold py-2 px-4 rounded text-white ${isMeshLoading || !selectedPref ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-700'}`}>
+              {isMeshLoading ? '取得中...' : '人口データを表示'}
+            </button>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </div>
+      <div className="w-full h-full">
+        <Map stops={stops} meshData={meshData} onClearStops={handleClearStops} />
+      </div>
+    </main>
   );
 }
