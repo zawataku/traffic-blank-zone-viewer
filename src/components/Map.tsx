@@ -1,8 +1,8 @@
 "use client";
 import { MapContainer, TileLayer, Circle, Tooltip, GeoJSON } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { LatLngExpression } from "leaflet";
-import { FeatureCollection } from "geojson";
+import { LatLngExpression, Layer } from "leaflet";
+import { FeatureCollection, Feature, Geometry } from "geojson";
 
 export interface Stop {
     stop_name: string;
@@ -17,7 +17,7 @@ interface MeshFeatureProperties {
 
 interface MapProps {
     stops: Stop[];
-    meshData: FeatureCollection<any, MeshFeatureProperties> | null;
+    meshData: FeatureCollection<Geometry, MeshFeatureProperties> | null;
     onClearStops: () => void;
 }
 
@@ -34,7 +34,9 @@ const getColor = (population: number) => {
 };
 
 const ClearButton = ({ onClearStops }: { onClearStops: () => void }) => {
-    const onClick = () => {
+    const onClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
         onClearStops();
     };
 
@@ -49,20 +51,24 @@ const ClearButton = ({ onClearStops }: { onClearStops: () => void }) => {
     );
 };
 
+
 const Map = ({ stops, meshData, onClearStops }: MapProps) => {
     const initialPosition: LatLngExpression = [36.698, 137.213]; // 富山駅周辺
 
-    const style = (feature: any) => ({
-        fillColor: getColor(feature.properties.population),
-        weight: 0.5,
-        opacity: 1,
-        color: 'white',
-        fillOpacity: 0.7
-    });
+    const style = (feature?: Feature<Geometry, MeshFeatureProperties>) => {
+        const population = feature?.properties?.population || 0;
+        return {
+            fillColor: getColor(population),
+            weight: 0.5,
+            opacity: 1,
+            color: 'white',
+            fillOpacity: 0.7
+        };
+    };
 
-    const onEachFeature = (feature: any, layer: any) => {
-        if (feature.properties && feature.properties.population) {
-            layer.bindTooltip(`人口: ${feature.properties.population}人`);
+    const onEachFeature = (feature: Feature<Geometry, MeshFeatureProperties>, layer: Layer) => {
+        if (feature.properties && typeof feature.properties.population === 'number') {
+            layer.bindTooltip(`人口: ${feature.properties.population.toLocaleString()}人`);
         }
     };
 

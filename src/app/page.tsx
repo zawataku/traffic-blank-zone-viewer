@@ -3,16 +3,28 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Papa from "papaparse";
 import { Stop } from "@/components/Map";
-import { FeatureCollection } from "geojson";
+import { FeatureCollection, Geometry } from "geojson";
+
+interface MeshFeatureProperties {
+  meshCode: string;
+  population: number;
+}
 
 interface Prefecture {
   code: string;
   name: string;
 }
 
+interface CsvRow {
+  stop_name: string;
+  stop_lat: string;
+  stop_lon: string;
+}
+
+
 export default function Home() {
   const [stops, setStops] = useState<Stop[]>([]);
-  const [meshData, setMeshData] = useState<FeatureCollection | null>(null);
+  const [meshData, setMeshData] = useState<FeatureCollection<Geometry, MeshFeatureProperties> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isMeshLoading, setIsMeshLoading] = useState(false);
   const [prefectures, setPrefectures] = useState<Prefecture[]>([]);
@@ -40,12 +52,12 @@ export default function Home() {
 
     const parsePromises = Array.from(files).map(file => {
       return new Promise<Stop[]>((resolve, reject) => {
-        Papa.parse(file, {
+        Papa.parse<CsvRow>(file, {
           header: true,
           skipEmptyLines: true,
           complete: (results) => {
             const validStops = results.data
-              .map((row: any) => ({
+              .map((row: CsvRow) => ({
                 stop_name: row.stop_name,
                 stop_lat: parseFloat(row.stop_lat),
                 stop_lon: parseFloat(row.stop_lon),
@@ -92,7 +104,7 @@ export default function Home() {
       const filePath = `/mesh_data/${selectedPref}.json`;
       const res = await fetch(filePath);
       if (!res.ok) throw new Error("Local file not found");
-      const data = await res.json();
+      const data: FeatureCollection<Geometry, MeshFeatureProperties> = await res.json();
       setMeshData(data);
     } catch (error) {
       console.error("Failed to fetch local mesh data:", error);
