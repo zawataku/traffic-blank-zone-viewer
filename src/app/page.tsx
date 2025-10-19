@@ -106,11 +106,11 @@ export default function Home() {
     <main className="flex h-screen w-screen">
       <div className="w-2/5 max-w-xl bg-gray-50 border-r border-gray-200 h-screen p-6 overflow-y-auto">
         <div className="space-y-8">
-          <h1 className="text-2xl font-bold text-gray-800">交通空白地帯 可視化まっぷ</h1>
+          <h1 className="text-2xl font-bold text-gray-800 text-center">交通空白地帯 可視化まっぷ</h1>
           <div className="space-y-3">
             <h2 className="text-lg font-semibold border-b pb-2">Step 1: バス停データを表示</h2>
             <p className="text-sm text-gray-600">
-              GTFSの`stops.txt`ファイルを1つまたは複数選択してください。データは地図に追加されます。
+              GTFSの`stops.txt`ファイルを1つまたは複数選択
             </p>
             <label htmlFor="gtfs-upload" className={`w-full text-center inline-block font-bold py-2 px-4 rounded cursor-pointer text-white ${isLoading ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-700'}`}>
               {isLoading ? '処理中...' : 'stops.txt を選択 (複数可)'}
@@ -126,14 +126,14 @@ export default function Home() {
             />
             {stops.length > 0 && (
               <p className="text-sm text-center text-gray-600">
-                現在 {stops.length} 件のバス停が表示されています。
+                現在 {stops.length} 件のバス停が表示されています
               </p>
             )}
           </div>
 
           <div className="space-y-3">
             <h2 className="text-lg font-semibold border-b pb-2">Step 2: 人口メッシュを重ねる</h2>
-            <p className="text-sm text-gray-600">都道府県を選択して人口データを表示します。</p>
+            <p className="text-sm text-gray-600">都道府県を選択して人口データを表示</p>
             <div>
               <label htmlFor="pref-select" className="block text-sm font-medium text-gray-700 mb-1">都道府県</label>
               <select id="pref-select" value={selectedPref} onChange={(e) => setSelectedPref(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md">

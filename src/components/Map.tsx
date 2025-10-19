@@ -73,8 +73,8 @@ const Map = ({ stops, meshData, onClearStops }: MapProps) => {
             style={{ height: "100%", width: "100%" }}
         >
             <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院 | 淡色地図</a>'
             />
 
             {meshData && (
